@@ -50,6 +50,22 @@ public class MovieReactiveService {
                 .log();
     }
 
+    public Flux<Movie> getAllMoviesWebClient() {
+        var moviesInfoFlux =  movieInfoService.retrieveAllMovieInfoWebClient();
+
+        return moviesInfoFlux
+                .flatMap(movieInfo ->  {
+                    Mono<List<Review>> reviewsMono = reviewService.retrieveReviewsFluxWebClient(movieInfo.getMovieInfoId()).collectList();
+                    return reviewsMono
+                            .map(reviewsList -> new Movie(movieInfo, reviewsList)).log();
+                })
+                .onErrorMap((ex) -> {
+                    log.error("Exception is: ", ex);
+                    throw new MovieException(ex.getMessage());
+                })
+                .log();
+    }
+
     public Flux<Movie> getAllMoviesRetry() {
         var moviesInfoFlux =  movieInfoService.retrieveMoviesFlux();
 
@@ -132,6 +148,12 @@ public class MovieReactiveService {
     public Mono<Movie> getMovieById(long movieId) {
         var movieInfoMono =  Mono.just(movieInfoService.retrieveMovieUsingId(movieId));
         var reviewsFlux = reviewService.retrieveReviewsFlux(movieId).collectList();
+        return movieInfoMono.zipWith(reviewsFlux, (movieInfo, reviews) -> new Movie(movieInfo, reviews)).log();
+    }
+
+    public Mono<Movie> getMovieByIdWebClient(long movieId) {
+        var movieInfoMono =  movieInfoService.retrieveMovieInfoByIdWebClient(movieId);
+        var reviewsFlux = reviewService.retrieveReviewsFluxWebClient(movieId).collectList();
         return movieInfoMono.zipWith(reviewsFlux, (movieInfo, reviews) -> new Movie(movieInfo, reviews)).log();
     }
 
